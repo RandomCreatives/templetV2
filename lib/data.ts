@@ -1,8 +1,11 @@
-import { photographs as fallbackPhotographs, printSizes, projects as fallbackProjects } from '@/data/sampleData';
 import type { Photograph, Project } from './types';
 import { getSupabaseReadClient, type PhotographRow, type ProjectRow } from './supabase';
+export { printSizes } from './printSizes';
 
-export { printSizes };
+type PaginationOptions = {
+  limit?: number;
+  offset?: number;
+};
 
 function mapProject(row: ProjectRow): Project {
   return {
@@ -30,32 +33,27 @@ function mapPhotograph(row: PhotographRow): Photograph {
   };
 }
 
-type PaginationOptions = {
-  limit?: number;
-  offset?: number;
-};
+function requireReadClient() {
+  const supabase = getSupabaseReadClient();
+  if (!supabase) {
+    return null;
+  }
+  return supabase;
+}
 
 export async function getProjects(): Promise<Project[]> {
-  const supabase = getSupabaseReadClient();
-  if (!supabase) return fallbackProjects;
+  const supabase = requireReadClient();
+  if (!supabase) return [];
 
   const { data, error } = await supabase.from('projects').select('*').order('created_at', { ascending: false });
-
-  if (error) {
-    console.error('Supabase getProjects failed; using local fallback.', error.message);
-    return fallbackProjects;
-  }
+  if (error) throw new Error(`Supabase getProjects failed: ${error.message}`);
 
   return data.map(mapProject);
 }
 
 export async function getPhotographs(options: PaginationOptions = {}): Promise<Photograph[]> {
-  const supabase = getSupabaseReadClient();
-  if (!supabase) {
-    const start = options.offset ?? 0;
-    const end = options.limit ? start + options.limit : undefined;
-    return fallbackPhotographs.slice(start, end);
-  }
+  const supabase = requireReadClient();
+  if (!supabase) return [];
 
   let query = supabase.from('photographs').select('*').order('created_at', { ascending: false });
 
@@ -65,39 +63,24 @@ export async function getPhotographs(options: PaginationOptions = {}): Promise<P
   }
 
   const { data, error } = await query;
-
-  if (error) {
-    console.error('Supabase getPhotographs failed; using local fallback.', error.message);
-    const start = options.offset ?? 0;
-    const end = options.limit ? start + options.limit : undefined;
-    return fallbackPhotographs.slice(start, end);
-  }
+  if (error) throw new Error(`Supabase getPhotographs failed: ${error.message}`);
 
   return data.map(mapPhotograph);
 }
 
 export async function getProjectById(id: string): Promise<Project | undefined> {
-  const supabase = getSupabaseReadClient();
-  if (!supabase) return fallbackProjects.find((project) => project.id === id);
+  const supabase = requireReadClient();
+  if (!supabase) return undefined;
 
   const { data, error } = await supabase.from('projects').select('*').eq('id', id).maybeSingle();
-
-  if (error) {
-    console.error('Supabase getProjectById failed; using local fallback.', error.message);
-    return fallbackProjects.find((project) => project.id === id);
-  }
+  if (error) throw new Error(`Supabase getProjectById failed: ${error.message}`);
 
   return data ? mapProject(data) : undefined;
 }
 
 export async function getPhotographsByProject(projectId: string, options: PaginationOptions = {}): Promise<Photograph[]> {
-  const supabase = getSupabaseReadClient();
-  if (!supabase) {
-    const full = fallbackPhotographs.filter((photo) => photo.projectId === projectId);
-    const start = options.offset ?? 0;
-    const end = options.limit ? start + options.limit : undefined;
-    return full.slice(start, end);
-  }
+  const supabase = requireReadClient();
+  if (!supabase) return [];
 
   let query = supabase.from('photographs').select('*').eq('project_id', projectId).order('created_at', { ascending: true });
 
@@ -107,28 +90,17 @@ export async function getPhotographsByProject(projectId: string, options: Pagina
   }
 
   const { data, error } = await query;
-
-  if (error) {
-    console.error('Supabase getPhotographsByProject failed; using local fallback.', error.message);
-    const full = fallbackPhotographs.filter((photo) => photo.projectId === projectId);
-    const start = options.offset ?? 0;
-    const end = options.limit ? start + options.limit : undefined;
-    return full.slice(start, end);
-  }
+  if (error) throw new Error(`Supabase getPhotographsByProject failed: ${error.message}`);
 
   return data.map(mapPhotograph);
 }
 
 export async function getPhotographByCode(imageCode: string): Promise<Photograph | undefined> {
-  const supabase = getSupabaseReadClient();
-  if (!supabase) return fallbackPhotographs.find((photo) => photo.imageCode === imageCode);
+  const supabase = requireReadClient();
+  if (!supabase) return undefined;
 
   const { data, error } = await supabase.from('photographs').select('*').eq('image_code', imageCode).maybeSingle();
-
-  if (error) {
-    console.error('Supabase getPhotographByCode failed; using local fallback.', error.message);
-    return fallbackPhotographs.find((photo) => photo.imageCode === imageCode);
-  }
+  if (error) throw new Error(`Supabase getPhotographByCode failed: ${error.message}`);
 
   return data ? mapPhotograph(data) : undefined;
 }

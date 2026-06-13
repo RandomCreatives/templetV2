@@ -72,6 +72,7 @@ NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=...
 SUPABASE_SERVICE_ROLE_KEY=...
 SUPABASE_ARCHIVE_BUCKET=archive
+SUPABASE_RECEIPTS_BUCKET=receipts
 ```
 
 Run `supabase/schema.sql` in the Supabase SQL editor before launch.
@@ -80,6 +81,7 @@ Run `supabase/schema.sql` in the Supabase SQL editor before launch.
 
 ```bash
 CHAPA_SECRET_KEY=...
+CHAPA_WEBHOOK_SECRET=...
 CHAPA_VERIFY_BASE_URL=https://api.chapa.co/v1/transaction/verify
 ```
 

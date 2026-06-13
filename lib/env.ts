@@ -13,7 +13,9 @@ type RuntimeEnv = {
   supabaseAnonKey?: string;
   supabaseServiceRoleKey?: string;
   supabaseArchiveBucket: string;
+  supabaseReceiptsBucket: string;
   chapaSecretKey?: string;
+  chapaWebhookSecret?: string;
   chapaVerifyBaseUrl: string;
 };
 
@@ -50,7 +52,9 @@ export function getServerEnv(): RuntimeEnv {
     supabaseAnonKey: trim(process.env.SUPABASE_ANON_KEY) ?? trim(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
     supabaseServiceRoleKey: trim(process.env.SUPABASE_SERVICE_ROLE_KEY),
     supabaseArchiveBucket: trim(process.env.SUPABASE_ARCHIVE_BUCKET) ?? 'archive',
+    supabaseReceiptsBucket: trim(process.env.SUPABASE_RECEIPTS_BUCKET) ?? 'receipts',
     chapaSecretKey: trim(process.env.CHAPA_SECRET_KEY),
+    chapaWebhookSecret: trim(process.env.CHAPA_WEBHOOK_SECRET),
     chapaVerifyBaseUrl: trim(process.env.CHAPA_VERIFY_BASE_URL) ?? 'https://api.chapa.co/v1/transaction/verify'
   };
 }

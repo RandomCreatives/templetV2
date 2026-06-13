@@ -26,11 +26,16 @@ create table if not exists public.orders (
   provider text not null,
   image_code text not null references public.photographs(image_code) on update cascade,
   size_id text not null,
-  customer_email text,
-  amount_cents integer not null check (amount_cents >= 0),
-  currency text not null default 'usd',
+  print_dimensions text,
+  customer_name text not null,
+  customer_email text not null,
+  customer_phone text not null,
+  delivery_address text not null,
+  amount_etb numeric not null check (amount_etb >= 0),
+  currency text not null default 'ETB' check (currency = 'ETB'),
   payment_status text not null default 'paid',
-  fulfillment_state text not null default 'pending_print_shipment',
+  fulfillment_status text not null default 'pending',
+  receipt_url text,
   metadata jsonb not null default '{}'::jsonb,
   created_at timestamptz not null default now()
 );
@@ -40,6 +45,7 @@ create index if not exists photographs_project_id_idx on public.photographs(proj
 create index if not exists photographs_image_code_idx on public.photographs(image_code);
 create index if not exists orders_tx_ref_idx on public.orders(tx_ref);
 create index if not exists orders_image_code_idx on public.orders(image_code);
+create index if not exists orders_customer_email_idx on public.orders(customer_email);
 create index if not exists orders_created_at_idx on public.orders(created_at desc);
 
 alter table public.projects enable row level security;
@@ -53,6 +59,10 @@ create policy "Public photographs are readable" on public.photographs for select
 
 insert into storage.buckets (id, name, public)
 values ('archive', 'archive', true)
+on conflict (id) do nothing;
+
+insert into storage.buckets (id, name, public)
+values ('receipts', 'receipts', false)
 on conflict (id) do nothing;
 
 create policy "Public archive objects are readable"

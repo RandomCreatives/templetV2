@@ -28,11 +28,16 @@ type OrderInsert = {
   provider: string;
   image_code: string;
   size_id: string;
-  customer_email: string | null;
-  amount_cents: number;
-  currency: string;
-  fulfillment_state: string;
+  print_dimensions: string | null;
+  customer_name: string;
+  customer_email: string;
+  customer_phone: string;
+  delivery_address: string;
+  amount_etb: number;
+  currency: 'ETB';
   payment_status: string;
+  fulfillment_status: string;
+  receipt_url: string | null;
   metadata: Record<string, unknown>;
 };
 
