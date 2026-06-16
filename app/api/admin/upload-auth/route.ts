@@ -1,55 +1,30 @@
+import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
-import {
-  ADMIN_UPLOAD_COOKIE,
-  createAdminUploadToken,
-  isAdminUploadConfigured,
-  verifyAdminUploadPassword
-} from '@/lib/adminAuth';
-import { getServerEnv } from '@/lib/env';
-import { getClientIp, rateLimit, rateLimitHeaders } from '@/lib/rateLimit';
+import { ADMIN_UPLOAD_COOKIE, verifyAdminUploadPassword, createAdminUploadToken } from '@/lib/adminAuth';
 
 export async function POST(request: Request) {
-  const limit = rateLimit({ key: `admin-upload:${getClientIp(request)}`, limit: 8, windowMs: 60 * 60 * 1000 });
-
-  if (!limit.ok) {
-    return NextResponse.json(
-      { ok: false, error: 'Too many unlock attempts. Try again later.' },
-      { status: 429, headers: rateLimitHeaders(limit) }
-    );
-  }
-
-  if (!isAdminUploadConfigured()) {
-    return NextResponse.json(
-      { ok: false, error: 'Admin upload is disabled. Set ADMIN_UPLOAD_PASSWORD in the deployment environment.' },
-      { status: 503 }
-    );
-  }
-
   const payload = (await request.json().catch(() => null)) as { password?: unknown } | null;
   const password = typeof payload?.password === 'string' ? payload.password : '';
 
   if (!verifyAdminUploadPassword(password)) {
-    return NextResponse.json({ ok: false, error: 'Invalid password.' }, { status: 401 });
+    return NextResponse.json({ ok: false, error: 'Invalid admin password.' }, { status: 401 });
   }
 
-  const env = getServerEnv();
-  const response = NextResponse.json({ ok: true });
+  const token = createAdminUploadToken();
+  const cookieStore = await cookies();
 
-  response.cookies.set({
-    name: ADMIN_UPLOAD_COOKIE,
-    value: createAdminUploadToken(),
+  cookieStore.set(ADMIN_UPLOAD_COOKIE, token, {
     httpOnly: true,
-    sameSite: 'lax',
-    secure: env.isProduction,
-    path: '/admin/upload',
-    maxAge: 60 * 60 * 8
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge: 60 * 60 * 24 // 24 hours
   });
 
-  return response;
+  return NextResponse.json({ ok: true });
 }
 
 export async function DELETE() {
-  const response = NextResponse.json({ ok: true });
-  response.cookies.set({ name: ADMIN_UPLOAD_COOKIE, value: '', path: '/admin/upload', maxAge: 0 });
-  return response;
+  const cookieStore = await cookies();
+  cookieStore.delete(ADMIN_UPLOAD_COOKIE);
+  return NextResponse.json({ ok: true });
 }

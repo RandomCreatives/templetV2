@@ -1,4 +1,5 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
+import { cookies } from 'next/headers';
 import { getServerEnv } from './env';
 
 export const ADMIN_UPLOAD_COOKIE = 'admin_upload_session';
@@ -37,4 +38,10 @@ export function verifyAdminUploadPassword(password: string) {
 
   if (submittedBuffer.length !== expectedBuffer.length) return false;
   return timingSafeEqual(submittedBuffer, expectedBuffer);
+}
+
+export async function verifyAdminSession() {
+  const cookieStore = await cookies();
+  const token = cookieStore.get(ADMIN_UPLOAD_COOKIE)?.value;
+  return verifyAdminUploadToken(token);
 }
