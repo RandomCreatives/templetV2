@@ -1,8 +1,12 @@
+export type PaymentMode = 'CHAPA' | 'MANUAL';
+
 type RuntimeEnv = {
   nodeEnv: 'development' | 'test' | 'production';
   siteUrl: string;
   isProduction: boolean;
   currency: string;
+  paymentMode: PaymentMode;
+  manualBankDetails: string;
   stripeSecretKey?: string;
   stripeWebhookSecret?: string;
   formspreeEndpoint?: string;
@@ -42,6 +46,8 @@ export function getServerEnv(): RuntimeEnv {
     isProduction: nodeEnv === 'production',
     siteUrl: normalizeSiteUrl(),
     currency: trim(process.env.NEXT_PUBLIC_CURRENCY)?.toLowerCase() ?? 'usd',
+    paymentMode: process.env.NEXT_PUBLIC_PAYMENT_MODE === 'MANUAL' ? 'MANUAL' : 'CHAPA',
+    manualBankDetails: trim(process.env.NEXT_PUBLIC_MANUAL_BANK_DETAILS) ?? 'Manual transfer details are not configured.',
     stripeSecretKey: trim(process.env.STRIPE_SECRET_KEY),
     stripeWebhookSecret: trim(process.env.STRIPE_WEBHOOK_SECRET),
     formspreeEndpoint: trim(process.env.FORMSPREE_ENDPOINT),

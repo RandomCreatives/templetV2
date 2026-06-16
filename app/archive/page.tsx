@@ -1,3 +1,4 @@
+import { AdminGate } from '@/components/AdminGate';
 import { MasonryArchive } from '@/components/MasonryArchive';
 import { getPhotographs } from '@/lib/data';
 
@@ -15,6 +16,7 @@ export default async function ArchivePage() {
         <p>{photographs.length} IMAGES</p>
       </div>
       <MasonryArchive photographs={photographs} />
+      <AdminGate />
     </main>
   );
 }

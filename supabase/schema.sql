@@ -20,6 +20,18 @@ create table if not exists public.photographs (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.creators (
+  id uuid primary key default gen_random_uuid(),
+  full_name text not null,
+  primary_content_hub text not null,
+  contact_email text not null unique,
+  local_phone text not null unique,
+  creator_code text not null unique,
+  tier text not null default 'tier_1',
+  status text not null default 'pending_verification',
+  created_at timestamptz not null default now()
+);
+
 create table if not exists public.orders (
   id uuid primary key default gen_random_uuid(),
   tx_ref text not null unique,
@@ -43,6 +55,9 @@ create table if not exists public.orders (
 create index if not exists photographs_created_at_idx on public.photographs(created_at desc);
 create index if not exists photographs_project_id_idx on public.photographs(project_id);
 create index if not exists photographs_image_code_idx on public.photographs(image_code);
+create index if not exists creators_creator_code_idx on public.creators(creator_code);
+create index if not exists creators_contact_email_idx on public.creators(contact_email);
+create index if not exists creators_created_at_idx on public.creators(created_at desc);
 create index if not exists orders_tx_ref_idx on public.orders(tx_ref);
 create index if not exists orders_image_code_idx on public.orders(image_code);
 create index if not exists orders_customer_email_idx on public.orders(customer_email);
@@ -50,6 +65,7 @@ create index if not exists orders_created_at_idx on public.orders(created_at des
 
 alter table public.projects enable row level security;
 alter table public.photographs enable row level security;
+alter table public.creators enable row level security;
 alter table public.orders enable row level security;
 
 create policy "Public projects are readable" on public.projects for select using (true);
@@ -62,9 +78,30 @@ values ('archive', 'archive', true)
 on conflict (id) do nothing;
 
 insert into storage.buckets (id, name, public)
+values ('portfolio', 'portfolio', true)
+on conflict (id) do nothing;
+
+insert into storage.buckets (id, name, public)
+values ('transfer_receipts', 'transfer_receipts', true)
+on conflict (id) do nothing;
+
+insert into storage.buckets (id, name, public)
 values ('receipts', 'receipts', false)
 on conflict (id) do nothing;
 
 create policy "Public archive objects are readable"
 on storage.objects for select
 using (bucket_id = 'archive');
+
+create policy "Public portfolio objects are readable"
+on storage.objects for select
+using (bucket_id = 'portfolio');
+
+create policy "Authenticated portfolio uploads are allowed"
+on storage.objects for insert
+to authenticated
+with check (bucket_id = 'portfolio');
+
+create policy "Public transfer receipts are readable"
+on storage.objects for select
+using (bucket_id = 'transfer_receipts');

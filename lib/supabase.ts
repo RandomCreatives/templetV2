@@ -23,6 +23,25 @@ type PhotographRow = {
   created_at: string;
 };
 
+type CreatorRow = {
+  id: string;
+  full_name: string;
+  primary_content_hub: string;
+  contact_email: string;
+  local_phone: string;
+  creator_code: string;
+  tier: string;
+  status: string;
+  created_at: string;
+};
+
+type OrderRow = OrderInsert & { id: string; created_at: string };
+
+type CreatorInsert = Omit<CreatorRow, 'id' | 'created_at'> & {
+  id?: string;
+  created_at?: string;
+};
+
 type OrderInsert = {
   tx_ref: string;
   provider: string;
@@ -69,6 +88,12 @@ type Database = {
           }
         ];
       };
+      creators: {
+        Row: CreatorRow;
+        Insert: CreatorInsert;
+        Update: Partial<CreatorRow>;
+        Relationships: [];
+      };
       orders: {
         Row: OrderInsert & { id: string; created_at: string };
         Insert: OrderInsert;
@@ -94,7 +119,7 @@ type Database = {
 let readClient: SupabaseClient<Database> | null = null;
 let serviceClient: SupabaseClient<Database> | null = null;
 
-export type { Database, OrderInsert, PhotographInsert, PhotographRow, ProjectRow };
+export type { CreatorInsert, CreatorRow, Database, OrderInsert, PhotographInsert, PhotographRow, ProjectRow };
 
 export function getSupabaseReadClient() {
   const env = getServerEnv();

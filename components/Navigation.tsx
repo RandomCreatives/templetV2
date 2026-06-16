@@ -1,4 +1,7 @@
+'use client';
+
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 const links = [
   { href: '/archive', label: 'ARCHIVE' },
@@ -7,6 +10,10 @@ const links = [
 ];
 
 export function Navigation() {
+  const pathname = usePathname();
+
+  if (pathname === '/register') return null;
+
   return (
     <header className="sticky top-0 z-40 border-b border-black bg-white">
       <nav className="mx-auto flex max-w-[1800px] items-center gap-2 px-3 py-3 font-mono text-[11px] uppercase tracking-[0.12em] text-black md:px-5">

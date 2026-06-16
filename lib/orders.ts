@@ -41,7 +41,7 @@ async function createReceiptPdf(input: ReceiptInput) {
   document.moveDown(0.5);
   document.fontSize(20).text('FINE ART PRINT RECEIPT');
   document.moveDown(1.5);
-  document.fontSize(9).fillColor('#555555').text('ARCHIVAL MONOCHROME PRINT ORDER / CHAPA ETB PAYMENT');
+  document.fontSize(9).fillColor('#555555').text('ARCHIVAL MONOCHROME PRINT ORDER / ETB PAYMENT');
   document.fillColor('#000000');
   document.moveDown(2);
 
@@ -117,7 +117,7 @@ export async function sendOrderConfirmationEmail(input: ReceiptInput & { receipt
       reply_to: input.customerEmail,
       subject: `Pending print shipment — ${input.imageCode}`,
       text: [
-        'A new Chapa / TeleBirr print order is ready for fulfillment.',
+        'A new print order is ready for fulfillment.',
         '',
         `Transaction: ${input.txRef}`,
         `Buyer: ${input.customerName}`,
@@ -138,13 +138,9 @@ export async function sendOrderConfirmationEmail(input: ReceiptInput & { receipt
   return { ok: true, mode: 'resend' as const };
 }
 
-export async function persistOrder(input: PersistOrderInput) {
-  const env = getServerEnv();
-  const supabase = getSupabaseServiceClient();
+function buildReceiptInput(input: PersistOrderInput): ReceiptInput {
   const size = getPrintSize(input.sizeId);
-  const amountEtb = input.amountEtb ?? (size ? Math.round(size.priceCents / 100) : 0);
-
-  const receiptInput: ReceiptInput = {
+  return {
     txRef: input.txRef,
     provider: input.provider,
     imageCode: input.imageCode,
@@ -153,9 +149,14 @@ export async function persistOrder(input: PersistOrderInput) {
     customerEmail: input.customerEmail ?? 'unknown@example.com',
     customerPhone: input.customerPhone ?? 'UNKNOWN PHONE',
     deliveryAddress: input.deliveryAddress ?? 'NO DELIVERY ADDRESS PROVIDED',
-    amountEtb,
+    amountEtb: input.amountEtb ?? (size ? Math.round(size.priceCents / 100) : 0),
     printDimensions: size?.dimensions ?? 'UNKNOWN DIMENSIONS'
   };
+}
+
+export async function persistOrder(input: PersistOrderInput) {
+  const supabase = getSupabaseServiceClient();
+  const receiptInput = buildReceiptInput(input);
 
   if (!supabase) {
     console.log('ORDER_PERSISTENCE_STUB', receiptInput);
@@ -175,7 +176,7 @@ export async function persistOrder(input: PersistOrderInput) {
     customer_email: receiptInput.customerEmail,
     customer_phone: receiptInput.customerPhone,
     delivery_address: receiptInput.deliveryAddress,
-    amount_etb: amountEtb,
+    amount_etb: receiptInput.amountEtb,
     currency: 'ETB',
     payment_status: 'paid',
     fulfillment_status: 'pending',
@@ -188,4 +189,39 @@ export async function persistOrder(input: PersistOrderInput) {
 
   await sendOrderConfirmationEmail({ ...receiptInput, receiptUrl });
   return { ok: true, mode: 'supabase' as const, order: data };
+}
+
+export async function approveManualTransferOrder(orderId: string) {
+  const supabase = getSupabaseServiceClient();
+  if (!supabase) throw new Error('Supabase service is not configured.');
+
+  const { data: order, error } = await supabase.from('orders').select('*').eq('id', orderId).single();
+  if (error) throw new Error(`Manual order lookup failed: ${error.message}`);
+
+  const receiptInput: ReceiptInput = {
+    txRef: order.tx_ref,
+    provider: order.provider,
+    imageCode: order.image_code,
+    sizeId: order.size_id,
+    customerName: order.customer_name,
+    customerEmail: order.customer_email,
+    customerPhone: order.customer_phone,
+    deliveryAddress: order.delivery_address,
+    amountEtb: Number(order.amount_etb),
+    printDimensions: order.print_dimensions ?? getPrintSize(order.size_id)?.dimensions ?? 'UNKNOWN DIMENSIONS'
+  };
+
+  const receiptUrl = await uploadReceipt(receiptInput);
+  const metadata = { ...(order.metadata ?? {}), manualApprovedAt: new Date().toISOString() };
+
+  const { data: updated, error: updateError } = await supabase
+    .from('orders')
+    .update({ payment_status: 'paid', fulfillment_status: 'pending', receipt_url: receiptUrl, metadata })
+    .eq('id', orderId)
+    .select('*')
+    .single();
+
+  if (updateError) throw new Error(`Manual order approval failed: ${updateError.message}`);
+  await sendOrderConfirmationEmail({ ...receiptInput, receiptUrl });
+  return updated;
 }

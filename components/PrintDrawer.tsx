@@ -7,6 +7,8 @@ import { DRAWER_IMAGE_SIZES, MUTED_GRAY_BLUR_DATA_URL } from '@/lib/image';
 import { usePrintDrawer } from './PrintDrawerProvider';
 
 const ETHIOPIAN_PHONE_PATTERN = /^(?:\+251|251|0)(?:9|7)\d{8}$/;
+const PAYMENT_MODE = process.env.NEXT_PUBLIC_PAYMENT_MODE === 'MANUAL' ? 'MANUAL' : 'CHAPA';
+const MANUAL_BANK_DETAILS = process.env.NEXT_PUBLIC_MANUAL_BANK_DETAILS ?? 'Manual transfer details are not configured.';
 
 function normalizePhone(value: string) {
   return value.replace(/[\s-]/g, '');
@@ -19,6 +21,10 @@ export function PrintDrawer() {
   const [email, setEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [locationDetails, setLocationDetails] = useState('');
+  const [transferReference, setTransferReference] = useState('');
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [isManualTransfer, setIsManualTransfer] = useState(false);
+  const [manualSuccess, setManualSuccess] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,12 +38,19 @@ export function PrintDrawer() {
       isPhoneValid &&
       locationDetails.trim().length >= 10
   );
+  const canSubmitManual = canSubmit && transferReference.trim().length >= 3 && Boolean(receiptFile);
 
   async function proceedToCheckout() {
     if (!selectedPhoto || !selectedSize) return;
 
     if (!canSubmit) {
       setError('Complete all delivery fields. Phone must use 09..., 07..., 251..., or +251... format.');
+      return;
+    }
+
+    if (PAYMENT_MODE === 'MANUAL') {
+      setIsManualTransfer(true);
+      setError(null);
       return;
     }
 
@@ -72,6 +85,41 @@ export function PrintDrawer() {
     }
   }
 
+  async function submitManualTransfer() {
+    if (!selectedPhoto || !selectedSize || !receiptFile) return;
+
+    if (!canSubmitManual) {
+      setError('Add the transfer reference and receipt screenshot before submitting.');
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('imageCode', selectedPhoto.imageCode);
+      formData.append('sizeId', selectedSize.id);
+      formData.append('fullName', fullName);
+      formData.append('email', email);
+      formData.append('phoneNumber', normalizePhone(phoneNumber));
+      formData.append('locationDetails', locationDetails);
+      formData.append('transferReference', transferReference);
+      formData.append('receiptFile', receiptFile);
+
+      const response = await fetch('/api/checkout/manual-route', { method: 'POST', body: formData });
+      const payload = (await response.json()) as { ok?: boolean; txRef?: string; error?: string };
+
+      if (!response.ok || !payload.ok) throw new Error(payload.error ?? 'Manual transfer submission failed.');
+
+      setManualSuccess(payload.txRef ?? 'MANUAL TRANSFER SUBMITTED');
+    } catch (manualError) {
+      setError(manualError instanceof Error ? manualError.message : 'Manual transfer submission failed.');
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
   return (
     <aside
       aria-hidden={!selectedPhoto}
@@ -84,7 +132,7 @@ export function PrintDrawer() {
     >
       <div className="flex h-full flex-col overflow-y-auto p-4 font-mono text-[11px] uppercase tracking-[0.08em]">
         <div className="mb-6 flex items-center justify-between border-b border-black pb-3">
-          <p>PRINT ORDER</p>
+          <p>{isManualTransfer ? 'MANUAL TRANSFER' : 'PRINT ORDER'}</p>
           <button className="text-black" type="button" onClick={closePrintDrawer} aria-label="Close print order panel">
             [ CLOSE ]
           </button>
@@ -92,90 +140,107 @@ export function PrintDrawer() {
 
         {selectedPhoto ? (
           <>
-            <div className="relative mb-3 w-full bg-gray-200" style={{ aspectRatio: `${selectedPhoto.aspectRatio}` }}>
-              <Image
-                src={selectedPhoto.imageUrl}
-                alt={selectedPhoto.title}
-                fill
-                sizes={DRAWER_IMAGE_SIZES}
-                placeholder="blur"
-                blurDataURL={MUTED_GRAY_BLUR_DATA_URL}
-                onContextMenu={(event) => event.preventDefault()}
-                className="select-none object-cover"
-                draggable={false}
-              />
-            </div>
-            <dl className="mb-5 grid grid-cols-[92px_1fr] gap-y-2 text-gray-700">
-              <dt>CODE</dt>
-              <dd className="text-black">{selectedPhoto.imageCode}</dd>
-              <dt>TITLE</dt>
-              <dd>{selectedPhoto.title}</dd>
-              <dt>LOCATION</dt>
-              <dd>{selectedPhoto.location}</dd>
-            </dl>
+            {!isManualTransfer ? (
+              <>
+                <div className="relative mb-3 w-full bg-gray-200" style={{ aspectRatio: `${selectedPhoto.aspectRatio}` }}>
+                  <Image
+                    src={selectedPhoto.imageUrl}
+                    alt={selectedPhoto.title}
+                    fill
+                    sizes={DRAWER_IMAGE_SIZES}
+                    placeholder="blur"
+                    blurDataURL={MUTED_GRAY_BLUR_DATA_URL}
+                    onContextMenu={(event) => event.preventDefault()}
+                    className="select-none object-cover"
+                    draggable={false}
+                  />
+                </div>
+                <dl className="mb-5 grid grid-cols-[92px_1fr] gap-y-2 text-gray-700">
+                  <dt>CODE</dt>
+                  <dd className="text-black">{selectedPhoto.imageCode}</dd>
+                  <dt>TITLE</dt>
+                  <dd>{selectedPhoto.title}</dd>
+                  <dt>LOCATION</dt>
+                  <dd>{selectedPhoto.location}</dd>
+                </dl>
 
-            <div className="grid gap-3 pb-4">
-              <label className="grid gap-1 text-gray-600" htmlFor="print-size">
-                SIZE
-                <select
-                  id="print-size"
-                  value={sizeId}
-                  onChange={(event) => setSizeId(event.target.value)}
-                  className="w-full appearance-none border border-black bg-white p-3 font-mono text-[11px] uppercase tracking-[0.08em] text-black outline-none"
-                >
-                  {printSizes.map((size) => (
-                    <option key={size.id} value={size.id}>
-                      {size.label} — {size.dimensions} — ETB {(size.priceCents / 100).toFixed(0)}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                <div className="grid gap-3 pb-4">
+                  <label className="grid gap-1 text-gray-600" htmlFor="print-size">
+                    SIZE
+                    <select
+                      id="print-size"
+                      value={sizeId}
+                      onChange={(event) => setSizeId(event.target.value)}
+                      className="w-full appearance-none border border-black bg-white p-3 font-mono text-[11px] uppercase tracking-[0.08em] text-black outline-none"
+                    >
+                      {printSizes.map((size) => (
+                        <option key={size.id} value={size.id}>
+                          {size.label} — {size.dimensions} — ETB {(size.priceCents / 100).toFixed(0)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
 
-              <label className="grid gap-1 text-gray-600">
-                FULL NAME
-                <input value={fullName} onChange={(event) => setFullName(event.target.value)} className="border border-black bg-white p-3 text-black outline-none" required />
-              </label>
-              <label className="grid gap-1 text-gray-600">
-                EMAIL ADDRESS
-                <input value={email} onChange={(event) => setEmail(event.target.value)} className="border border-black bg-white p-3 text-black outline-none" type="email" required />
-              </label>
-              <label className="grid gap-1 text-gray-600">
-                PHONE NUMBER
-                <input
-                  value={phoneNumber}
-                  onChange={(event) => setPhoneNumber(event.target.value)}
-                  className="border border-black bg-white p-3 text-black outline-none"
-                  type="tel"
-                  placeholder="09..., 07..., +251..."
-                  required
-                />
-              </label>
-              <label className="grid gap-1 text-gray-600">
-                DELIVERY LOCATION DETAILS
-                <textarea
-                  value={locationDetails}
-                  onChange={(event) => setLocationDetails(event.target.value)}
-                  className="min-h-24 border border-black bg-white p-3 text-black outline-none"
-                  placeholder="Addis Ababa neighborhood, landmark, building, courier note"
-                  required
-                />
-              </label>
-            </div>
+                  <label className="grid gap-1 text-gray-600">
+                    FULL NAME
+                    <input value={fullName} onChange={(event) => setFullName(event.target.value)} className="border border-black bg-white p-3 text-black outline-none" required />
+                  </label>
+                  <label className="grid gap-1 text-gray-600">
+                    EMAIL ADDRESS
+                    <input value={email} onChange={(event) => setEmail(event.target.value)} className="border border-black bg-white p-3 text-black outline-none" type="email" required />
+                  </label>
+                  <label className="grid gap-1 text-gray-600">
+                    PHONE NUMBER
+                    <input value={phoneNumber} onChange={(event) => setPhoneNumber(event.target.value)} className="border border-black bg-white p-3 text-black outline-none" type="tel" placeholder="09..., 07..., +251..." required />
+                  </label>
+                  <label className="grid gap-1 text-gray-600">
+                    DELIVERY LOCATION DETAILS
+                    <textarea value={locationDetails} onChange={(event) => setLocationDetails(event.target.value)} className="min-h-24 border border-black bg-white p-3 text-black outline-none" placeholder="Addis Ababa neighborhood, landmark, building, courier note" required />
+                  </label>
+                </div>
 
-            <div className="mt-auto border-t border-black pt-3">
-              <p className="mb-3 text-[10px] leading-relaxed text-gray-500">
-                Delivery Commitment: Fine art printing, professional archival mounting, and local courier delivery takes up to 10 working days.
-              </p>
-              <button
-                type="button"
-                onClick={proceedToCheckout}
-                disabled={isLoading || !canSubmit}
-                className="w-full bg-black px-4 py-4 text-center text-white disabled:bg-gray-500"
-              >
-                {isLoading ? '[ CREATING CHAPA CHECKOUT ]' : '[ PROCEED TO CHAPA CHECKOUT ]'}
-              </button>
-              {error ? <p className="mt-3 text-gray-700">{error}</p> : null}
-            </div>
+                <div className="mt-auto border-t border-black pt-3">
+                  <p className="mb-3 text-[10px] leading-relaxed text-gray-500">
+                    Delivery Commitment: Fine art printing, professional archival mounting, and local courier delivery takes up to 10 working days.
+                  </p>
+                  <button type="button" onClick={proceedToCheckout} disabled={isLoading || !canSubmit} className="w-full bg-black px-4 py-4 text-center text-white disabled:bg-gray-500">
+                    {PAYMENT_MODE === 'MANUAL' ? '[ CONTINUE TO MANUAL TRANSFER ]' : isLoading ? '[ CREATING CHAPA CHECKOUT ]' : '[ PROCEED TO CHAPA CHECKOUT ]'}
+                  </button>
+                  {error ? <p className="mt-3 text-gray-700">{error}</p> : null}
+                </div>
+              </>
+            ) : (
+              <div className="grid gap-4">
+                <div className="border border-black bg-black p-4 text-white">
+                  <p className="mb-3 text-[10px] text-gray-300">DIRECT LOCAL TRANSFER DETAILS</p>
+                  <pre className="whitespace-pre-wrap font-mono text-[12px] leading-relaxed">{MANUAL_BANK_DETAILS}</pre>
+                </div>
+                <dl className="grid grid-cols-[92px_1fr] gap-y-2 text-gray-700">
+                  <dt>ORDER</dt>
+                  <dd className="text-black">{selectedPhoto.imageCode}</dd>
+                  <dt>SIZE</dt>
+                  <dd>{selectedSize.label} / {selectedSize.dimensions}</dd>
+                  <dt>TOTAL</dt>
+                  <dd>ETB {(selectedSize.priceCents / 100).toFixed(0)}</dd>
+                </dl>
+                <label className="grid gap-1 text-gray-600">
+                  PAST TRANSACTION REFERENCE / NUMBER
+                  <input value={transferReference} onChange={(event) => setTransferReference(event.target.value)} className="border border-black bg-white p-3 text-black outline-none" required />
+                </label>
+                <label className="grid gap-1 text-gray-600">
+                  TRANSFER CONFIRMATION SCREENSHOT
+                  <input onChange={(event) => setReceiptFile(event.target.files?.[0] ?? null)} className="border border-black bg-white p-3 text-black outline-none" type="file" accept="image/*" required />
+                </label>
+                <p className="text-[10px] leading-relaxed text-gray-500">
+                  Delivery Commitment: Fine art printing, professional archival mounting, and local courier delivery takes up to 10 working days.
+                </p>
+                <button type="button" onClick={submitManualTransfer} disabled={isLoading || !canSubmitManual} className="bg-black px-4 py-4 text-white disabled:bg-gray-500">
+                  {isLoading ? '[ SUBMITTING TRANSFER ]' : '[ SUBMIT FOR VERIFICATION ]'}
+                </button>
+                {manualSuccess ? <p className="border border-black p-3 text-black">[ SUBMITTED ] {manualSuccess} / UNPAID / VERIFY TRANSFER</p> : null}
+                {error ? <p className="text-gray-700">{error}</p> : null}
+              </div>
+            )}
           </>
         ) : null}
       </div>

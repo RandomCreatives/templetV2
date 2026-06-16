@@ -28,10 +28,12 @@ ADMIN_UPLOAD_PASSWORD=use-a-long-random-password
 
 Required to access `/admin/upload`. If omitted, the route is disabled and only shows a locked notice.
 
-### Currency
+### Currency and payment mode
 
 ```bash
-NEXT_PUBLIC_CURRENCY=usd
+NEXT_PUBLIC_CURRENCY=etb
+NEXT_PUBLIC_PAYMENT_MODE=CHAPA # or MANUAL
+NEXT_PUBLIC_MANUAL_BANK_DETAILS="Commercial Bank of Ethiopia\nAccount: 1000XXXXXXXXX\nName: Creator Name"
 ```
 
 ### Stripe checkout fallback
