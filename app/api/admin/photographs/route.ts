@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseServiceClient } from '@/lib/supabase';
+import { verifyAdminSession } from '@/lib/adminAuth';
 
 export async function POST(request: Request) {
+  if (!await verifyAdminSession()) {
+    return NextResponse.json({ ok: false, error: 'Unauthorized.' }, { status: 401 });
+  }
+
   const payload = (await request.json().catch(() => null)) as {
     imageCode?: unknown;
     imageUrl?: unknown;
