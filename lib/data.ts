@@ -1,5 +1,6 @@
 import type { Photograph, Project } from './types';
 import { getSupabaseReadClient, type PhotographRow, type ProjectRow } from './supabase';
+import { photographs as samplePhotographs, projects as sampleProjects } from '@/data/sampleData';
 export { printSizes } from './printSizes';
 
 type PaginationOptions = {
@@ -43,7 +44,7 @@ function requireReadClient() {
 
 export async function getProjects(): Promise<Project[]> {
   const supabase = requireReadClient();
-  if (!supabase) return [];
+  if (!supabase) return sampleProjects;
 
   const { data, error } = await supabase.from('projects').select('*').order('created_at', { ascending: false });
   if (error) throw new Error(`Supabase getProjects failed: ${error.message}`);
@@ -53,7 +54,14 @@ export async function getProjects(): Promise<Project[]> {
 
 export async function getPhotographs(options: PaginationOptions = {}): Promise<Photograph[]> {
   const supabase = requireReadClient();
-  if (!supabase) return [];
+  if (!supabase) {
+    let results = samplePhotographs;
+    if (typeof options.limit === 'number') {
+      const offset = options.offset ?? 0;
+      results = results.slice(offset, offset + options.limit);
+    }
+    return results;
+  }
 
   let query = supabase.from('photographs').select('*').order('created_at', { ascending: false });
 
@@ -70,7 +78,7 @@ export async function getPhotographs(options: PaginationOptions = {}): Promise<P
 
 export async function getProjectById(id: string): Promise<Project | undefined> {
   const supabase = requireReadClient();
-  if (!supabase) return undefined;
+  if (!supabase) return sampleProjects.find((p) => p.id === id);
 
   const { data, error } = await supabase.from('projects').select('*').eq('id', id).maybeSingle();
   if (error) throw new Error(`Supabase getProjectById failed: ${error.message}`);
@@ -80,7 +88,14 @@ export async function getProjectById(id: string): Promise<Project | undefined> {
 
 export async function getPhotographsByProject(projectId: string, options: PaginationOptions = {}): Promise<Photograph[]> {
   const supabase = requireReadClient();
-  if (!supabase) return [];
+  if (!supabase) {
+    let results = samplePhotographs.filter((p) => p.projectId === projectId);
+    if (typeof options.limit === 'number') {
+      const offset = options.offset ?? 0;
+      results = results.slice(offset, offset + options.limit);
+    }
+    return results;
+  }
 
   let query = supabase.from('photographs').select('*').eq('project_id', projectId).order('created_at', { ascending: true });
 
@@ -97,7 +112,7 @@ export async function getPhotographsByProject(projectId: string, options: Pagina
 
 export async function getPhotographByCode(imageCode: string): Promise<Photograph | undefined> {
   const supabase = requireReadClient();
-  if (!supabase) return undefined;
+  if (!supabase) return samplePhotographs.find((p) => p.imageCode === imageCode);
 
   const { data, error } = await supabase.from('photographs').select('*').eq('image_code', imageCode).maybeSingle();
   if (error) throw new Error(`Supabase getPhotographByCode failed: ${error.message}`);
