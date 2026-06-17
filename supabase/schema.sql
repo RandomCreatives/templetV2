@@ -82,7 +82,7 @@ values ('portfolio', 'portfolio', true)
 on conflict (id) do nothing;
 
 insert into storage.buckets (id, name, public)
-values ('transfer_receipts', 'transfer_receipts', true)
+values ('transfer_receipts', 'transfer_receipts', false)
 on conflict (id) do nothing;
 
 insert into storage.buckets (id, name, public)
@@ -102,6 +102,4 @@ on storage.objects for insert
 to authenticated
 with check (bucket_id = 'portfolio');
 
-create policy "Public transfer receipts are readable"
-on storage.objects for select
-using (bucket_id = 'transfer_receipts');
+-- transfer_receipts is now private. Access requires signed URLs via service role.

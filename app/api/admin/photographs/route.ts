@@ -7,23 +7,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: 'Unauthorized.' }, { status: 401 });
   }
 
-  const payload = (await request.json().catch(() => null)) as {
-    imageCode?: unknown;
-    imageUrl?: unknown;
-    aspectRatio?: unknown;
-    title?: unknown;
-    location?: unknown;
-    projectId?: unknown;
-  } | null;
+  const payload = await request.json();
+  const { imageCode, imageUrl, aspectRatio, title, location, category, projectId, priceTierId } = payload;
 
-  const imageCode = typeof payload?.imageCode === 'string' ? payload.imageCode.trim().toUpperCase() : '';
-  const imageUrl = typeof payload?.imageUrl === 'string' ? payload.imageUrl.trim() : '';
-  const title = typeof payload?.title === 'string' ? payload.title.trim() : '';
-  const location = typeof payload?.location === 'string' ? payload.location.trim() : '';
-  const projectId = typeof payload?.projectId === 'string' && payload.projectId ? payload.projectId : null;
-  const aspectRatio = Number(payload?.aspectRatio);
-
-  if (!imageCode || !imageUrl || !title || !Number.isFinite(aspectRatio) || aspectRatio <= 0) {
+  if (!imageCode || !imageUrl || !aspectRatio || !title) {
     return NextResponse.json({ ok: false, error: 'Missing required photograph fields.' }, { status: 400 });
   }
 
@@ -37,11 +24,11 @@ export async function POST(request: Request) {
       image_url: imageUrl,
       aspect_ratio: aspectRatio,
       title,
-      location: location || 'Creator Upload',
-      category: 'creator-dashboard',
+      location: location ?? 'Unknown',
+      category: category ?? 'Archive',
+      project_id: projectId || null,
       is_print_available: true,
-      price_tier_id: 'standard',
-      project_id: projectId
+      price_tier_id: priceTierId || null
     })
     .select('*')
     .single();
