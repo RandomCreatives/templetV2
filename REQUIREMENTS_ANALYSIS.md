@@ -59,3 +59,20 @@ Current Implementation (`components/MasonryArchive.tsx`):
 ---
 
 **Status**: Ready for implementation of Phase: Pinterest Archive.
+
+---
+
+## 4. Platform Integration Assessment (Vercel & Supabase)
+
+### 4.1 Vercel Configuration
+- **Security Headers**: `vercel.json` correctly implements a restrictive Content Security Policy (CSP), X-Frame-Options (DENY), and Permissions-Policy. This significantly hardens the application against XSS and Clickjacking.
+- **Asset Optimization**: Aggressive caching (`max-age=31536000, immutable`) is configured for the `/images/` directory, ensuring high performance for photography assets.
+- **Environment Handling**: The application dynamically resolves `siteUrl` using Vercel's system variables (`VERCEL_URL`), ensuring that deployment previews and production environments have correct absolute links.
+
+### 4.2 Supabase Integration
+- **Database Schema**: `supabase/schema.sql` defines a normalized structure with appropriate indexes for photography archive operations. The use of UUIDs for primary keys and foreign key constraints (e.g., `orders -> photographs`) ensures data integrity.
+- **Row Level Security (RLS)**: Public readability is granted for `projects` and `photographs`, while sensitive data like `creators` and `orders` is restricted to service-role access only. This adheres to the principle of least privilege.
+- **Storage Strategy**: Distinct buckets (`archive`, `portfolio`, `transfer_receipts`, `receipts`) are used for different asset types. The `receipts` bucket is private, requiring signed URLs for access, which is the correct security posture for customer financial records.
+
+### 4.3 Integration Health
+The integration between Vercel and Supabase is **Optimal**. The environment variable mapping in `lib/env.ts` provides a clean interface for both client-side (public) and server-side (private) operations.
