@@ -16,5 +16,24 @@ export async function GET() {
     .order('created_at', { ascending: false });
 
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true, orders: data });
+
+  // For manual transfers, we need to generate signed URLs for the screenshots
+  const orders = await Promise.all((data || []).map(async (order) => {
+    if (order.provider === 'manual_transfer' && order.metadata?.transferReceiptPath) {
+      const { data: signed } = await supabase.storage
+        .from('transfer_receipts')
+        .createSignedUrl(order.metadata.transferReceiptPath as string, 3600);
+
+      return {
+        ...order,
+        metadata: {
+          ...order.metadata,
+          transferReceiptUrl: signed?.signedUrl ?? order.metadata.transferReceiptUrl
+        }
+      };
+    }
+    return order;
+  }));
+
+  return NextResponse.json({ ok: true, orders });
 }

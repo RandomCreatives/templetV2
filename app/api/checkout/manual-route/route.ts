@@ -4,6 +4,26 @@ import { getSupabaseServiceClient } from '@/lib/supabase';
 
 const ETHIOPIAN_PHONE_PATTERN = /^(?:\+251|251|0)(?:9|7)\d{8}$/;
 
+// Simple in-memory rate limiting for manual transfer route
+const rateLimits = new Map<string, { count: number; resetAt: number }>();
+const LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+const MAX_REQUESTS_PER_WINDOW = 5;
+
+function checkRateLimit(ip: string) {
+  const now = Date.now();
+  const limit = rateLimits.get(ip);
+
+  if (!limit || now > limit.resetAt) {
+    rateLimits.set(ip, { count: 1, resetAt: now + LIMIT_WINDOW_MS });
+    return true;
+  }
+
+  if (limit.count >= MAX_REQUESTS_PER_WINDOW) return false;
+
+  limit.count++;
+  return true;
+}
+
 function normalizePhone(value: string) {
   return value.replace(/[\s-]/g, '');
 }
@@ -13,6 +33,11 @@ function cleanFileName(value: string) {
 }
 
 export async function POST(request: Request) {
+  const ip = request.headers.get('x-forwarded-for') ?? 'unknown';
+  if (!checkRateLimit(ip)) {
+    return NextResponse.json({ ok: false, error: 'Too many requests. Please try again in an hour.' }, { status: 429 });
+  }
+
   const formData = await request.formData();
   const imageCode = String(formData.get('imageCode') ?? '').trim();
   const sizeId = String(formData.get('sizeId') ?? '').trim();

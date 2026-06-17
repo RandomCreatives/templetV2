@@ -13,7 +13,7 @@ export async function GET() {
   const { data, error } = await supabase.from('orders').select('image_code, amount_etb, payment_status');
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
 
-  const paid = data.filter((order) => order.payment_status === 'paid');
+  const paid = (data || []).filter((order) => order.payment_status === 'paid');
   const totalRevenue = paid.reduce((sum, order) => sum + Number(order.amount_etb ?? 0), 0);
   const counts = new Map<string, number>();
 

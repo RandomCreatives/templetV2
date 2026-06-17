@@ -1,9 +1,14 @@
 import { NextResponse } from 'next/server';
 import { getSupabaseServiceClient } from '@/lib/supabase';
+import { verifyAdminSession } from '@/lib/adminAuth';
 
 const CREATOR_CODE_PATTERN = /^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/;
 
 export async function POST(request: Request) {
+  if (!await verifyAdminSession()) {
+    return NextResponse.json({ ok: false, error: 'Unauthorized.' }, { status: 401 });
+  }
+
   const payload = (await request.json().catch(() => null)) as { creatorCode?: unknown } | null;
   const creatorCode = typeof payload?.creatorCode === 'string' ? payload.creatorCode.trim().toUpperCase() : '';
 

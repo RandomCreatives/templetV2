@@ -9,9 +9,11 @@ export async function PATCH(request: Request) {
 
   const payload = (await request.json().catch(() => null)) as { orderId?: unknown; status?: unknown } | null;
   const orderId = typeof payload?.orderId === 'string' ? payload.orderId : '';
-  const status = payload?.status === 'delivered' ? 'delivered' : 'pending';
+  const status = typeof payload?.status === 'string' ? payload.status : '';
 
-  if (!orderId) return NextResponse.json({ ok: false, error: 'Missing orderId.' }, { status: 400 });
+  if (!orderId || !status) {
+    return NextResponse.json({ ok: false, error: 'Missing orderId or status.' }, { status: 400 });
+  }
 
   const supabase = getSupabaseServiceClient();
   if (!supabase) return NextResponse.json({ ok: false, error: 'Supabase service is not configured.' }, { status: 503 });
@@ -20,7 +22,7 @@ export async function PATCH(request: Request) {
     .from('orders')
     .update({ fulfillment_status: status })
     .eq('id', orderId)
-    .select('id, fulfillment_status')
+    .select('*')
     .single();
 
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });

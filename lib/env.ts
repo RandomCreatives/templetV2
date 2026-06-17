@@ -20,7 +20,6 @@ type RuntimeEnv = {
   supabaseReceiptsBucket: string;
   chapaSecretKey?: string;
   chapaWebhookSecret?: string;
-  chapaVerifyBaseUrl: string;
 };
 
 function trim(value: string | undefined) {
@@ -60,8 +59,7 @@ export function getServerEnv(): RuntimeEnv {
     supabaseArchiveBucket: trim(process.env.SUPABASE_ARCHIVE_BUCKET) ?? 'archive',
     supabaseReceiptsBucket: trim(process.env.SUPABASE_RECEIPTS_BUCKET) ?? 'receipts',
     chapaSecretKey: trim(process.env.CHAPA_SECRET_KEY),
-    chapaWebhookSecret: trim(process.env.CHAPA_WEBHOOK_SECRET),
-    chapaVerifyBaseUrl: trim(process.env.CHAPA_VERIFY_BASE_URL) ?? 'https://api.chapa.co/v1/transaction/verify'
+    chapaWebhookSecret: trim(process.env.CHAPA_WEBHOOK_SECRET)
   };
 }
 
