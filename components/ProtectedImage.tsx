@@ -21,7 +21,8 @@ export function ProtectedImage({ photo, priority = false, sizes = ARCHIVE_IMAGE_
     setIsSaved(saved.includes(photo.imageCode));
   }, [photo.imageCode]);
 
-  function toggleSaved() {
+  function toggleSaved(e: React.MouseEvent) {
+    e.stopPropagation();
     const saved = JSON.parse(window.localStorage.getItem('savedImageCodes') ?? '[]') as string[];
     const nextSaved = saved.includes(photo.imageCode)
       ? saved.filter((code) => code !== photo.imageCode)
@@ -32,8 +33,8 @@ export function ProtectedImage({ photo, priority = false, sizes = ARCHIVE_IMAGE_
   }
 
   return (
-    <figure className="group relative mb-4 break-inside-avoid">
-      <div className="relative bg-gray-200" style={{ aspectRatio: `${photo.aspectRatio}` }}>
+    <figure className="group relative mb-3 break-inside-avoid md:mb-4">
+      <div className="relative overflow-hidden bg-gray-100" style={{ aspectRatio: `${photo.aspectRatio}` }}>
         <Image
           src={photo.imageUrl}
           alt={photo.title}
@@ -44,33 +45,56 @@ export function ProtectedImage({ photo, priority = false, sizes = ARCHIVE_IMAGE_
           blurDataURL={MUTED_GRAY_BLUR_DATA_URL}
           draggable={false}
           onContextMenu={(event) => event.preventDefault()}
-          className="select-none object-cover"
+          className="select-none object-cover transition-transform duration-700 group-hover:scale-105"
         />
-        <div className="pointer-events-none absolute inset-0 bg-black/0 transition-colors duration-75 group-hover:bg-black/25 group-focus-within:bg-black/25" />
-        <button
-          type="button"
-          className="absolute left-2 top-2 font-mono text-[10px] uppercase tracking-[0.12em] text-white opacity-0 transition-opacity duration-75 group-hover:opacity-100 group-focus:opacity-100"
-          onClick={toggleSaved}
-        >
-          {isSaved ? '[ SAVED ]' : '[ SAVE ]'}
-        </button>
-        {photo.isPrintAvailable ? (
-          <button
-            type="button"
-            className="absolute bottom-2 left-2 font-mono text-[10px] uppercase tracking-[0.12em] text-white opacity-0 transition-opacity duration-75 group-hover:opacity-100 group-focus:opacity-100"
-            onClick={() => openPrintDrawer(photo)}
-          >
-            [ ORDER PRINT - {photo.imageCode} ]
-          </button>
-        ) : (
-          <span className="absolute bottom-2 left-2 font-mono text-[10px] uppercase tracking-[0.12em] text-white opacity-0 transition-opacity duration-75 group-hover:opacity-100">
-            [ PRINT UNAVAILABLE - {photo.imageCode} ]
-          </span>
-        )}
+
+        {/* Pinterest-style Interactive Overlay */}
+        <div className="absolute inset-0 bg-black/40 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
+          <div className="flex h-full flex-col justify-between p-4 font-mono text-[9px] uppercase tracking-[0.1em] text-white">
+            <div className="flex items-start justify-between">
+              <span className="bg-black/60 px-2 py-1.5 backdrop-blur-md border border-white/10">
+                {photo.imageCode}
+              </span>
+              <button
+                type="button"
+                onClick={toggleSaved}
+                className="bg-black/60 px-3 py-1.5 transition-all hover:bg-white hover:text-black backdrop-blur-md border border-white/10"
+              >
+                {isSaved ? '[ SAVED ]' : '[ SAVE ]'}
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <div className="bg-black/60 p-3 backdrop-blur-md border border-white/10">
+                <p className="font-sans text-[12px] font-medium tracking-normal leading-tight">
+                  {photo.title}
+                </p>
+                <div className="mt-2 flex items-center justify-between opacity-80">
+                  <p>{photo.location}</p>
+                  <p>{photo.category}</p>
+                </div>
+              </div>
+
+              {photo.isPrintAvailable ? (
+                <button
+                  type="button"
+                  className="w-full bg-white py-2.5 text-black transition-all hover:bg-gray-200 active:scale-[0.98]"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    openPrintDrawer(photo);
+                  }}
+                >
+                  [ ORDER ARCHIVAL PRINT ]
+                </button>
+              ) : (
+                <span className="w-full border border-white/30 bg-black/40 py-2.5 text-center text-white/50 backdrop-blur-md">
+                  [ PRINT UNAVAILABLE ]
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
-      <figcaption className="mt-1 font-mono text-[10px] uppercase tracking-[0.08em] text-gray-500">
-        {photo.location}
-      </figcaption>
     </figure>
   );
 }
