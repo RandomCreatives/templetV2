@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 import { Navigation } from '@/components/Navigation';
 import { PrintDrawerProvider } from '@/components/PrintDrawerProvider';
 import { StructuredData } from '@/components/StructuredData';
@@ -48,6 +50,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           <div id="main-content">{children}</div>
         </PrintDrawerProvider>
         <StructuredData />
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );

@@ -1,142 +1,60 @@
-# Vercel Deployment Checklist
+# Vercel & Supabase Deployment Checklist
 
-## Required build settings
+## 1. Required Build Settings (Vercel)
 
 - Framework Preset: `Next.js`
+- Node.js Version: `20.x` or newer
 - Install Command: `npm install`
 - Build Command: `npm run build`
-- Output Directory: leave empty / Next.js default
-- Node.js Version: 20.x or newer
 
-## Required environment variables
+## 2. Environment Variables
 
-Paste these into **Vercel Project → Settings → Environment Variables**.
+Configure these in **Vercel Project → Settings → Environment Variables**.
 
-### Application URL
+### 2.1 Core Application
+- `NEXT_PUBLIC_SITE_URL`: Your production URL. Falls back to `VERCEL_URL` if omitted.
+- `ADMIN_UPLOAD_PASSWORD`: Secure password for `/admin/upload`.
 
+### 2.2 Payment & Currency
+- `NEXT_PUBLIC_CURRENCY`: e.g., `etb`
+- `NEXT_PUBLIC_PAYMENT_MODE`: `CHAPA` or `MANUAL`
+- `NEXT_PUBLIC_MANUAL_BANK_DETAILS`: Bank info for manual transfers.
+
+### 2.3 Supabase (Marketplace Integration Recommended)
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_ARCHIVE_BUCKET`: `archive`
+- `SUPABASE_RECEIPTS_BUCKET`: `receipts`
+
+> **Note**: For optimal performance, ensure your Vercel Project Region matches your Supabase Project Region (e.g., `us-east-1` or `eu-central-1`).
+
+### 2.4 External Gateways
+- **Stripe**: `STRIPE_SECRET_KEY`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`
+- **Chapa**: `CHAPA_SECRET_KEY`, `CHAPA_WEBHOOK_SECRET`
+- **Resend**: `RESEND_API_KEY`, `CONTACT_TO_EMAIL`
+
+## 3. Marketplace Integration
+Vercel offers an official **Supabase Integration**. Enabling this in the Vercel Dashboard will:
+1. Automatically link your projects.
+2. Synchronize environment variables (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, etc.).
+3. Provide a direct link to the Supabase dashboard from Vercel.
+
+## 4. Observability
+The application is pre-configured with:
+- **Vercel Analytics**: Track page views and unique visitors.
+- **Speed Insights**: Monitor Web Vitals and performance in real-time.
+
+Enable these in the **Vercel Dashboard → Analytics / Speed Insights** tabs.
+
+## 5. Security & Infrastructure
+- **CSP**: `vercel.json` enforces a strict Content Security Policy.
+- **HSTS**: Standard on all Vercel deployments.
+- **Edge Config**: API routes are optimized for standard Node.js runtime but can be opted into Edge via `export const runtime = 'edge'` if lower latency is required for global users.
+
+## 6. Pre-flight Check
+Before pushing to production, run:
 ```bash
-NEXT_PUBLIC_SITE_URL=https://your-domain.com
+npm run verify
 ```
-
-If omitted, the app falls back to `https://${VERCEL_URL}` automatically.
-
-### Admin upload gate
-
-```bash
-ADMIN_UPLOAD_PASSWORD=use-a-long-random-password
-```
-
-Required to access `/admin/upload`. If omitted, the route is disabled and only shows a locked notice.
-
-### Currency and payment mode
-
-```bash
-NEXT_PUBLIC_CURRENCY=etb
-NEXT_PUBLIC_PAYMENT_MODE=CHAPA # or MANUAL
-NEXT_PUBLIC_MANUAL_BANK_DETAILS="Commercial Bank of Ethiopia\nAccount: 1000XXXXXXXXX\nName: Creator Name"
-```
-
-### Stripe checkout fallback
-
-```bash
-STRIPE_SECRET_KEY=sk_live_or_sk_test_...
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_live_or_pk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...
-```
-
-If `STRIPE_SECRET_KEY` is omitted, `/api/checkout` returns a controlled Sandbox/Test Mode response instead of throwing a production 500.
-
-### Contact form delivery
-
-Use one provider.
-
-#### Option A — Formspree
-
-```bash
-FORMSPREE_ENDPOINT=https://formspree.io/f/your_form_id
-```
-
-#### Option B — Resend
-
-```bash
-RESEND_API_KEY=re_...
-CONTACT_TO_EMAIL=studio@example.com
-```
-
-If neither provider is configured, the API validates the payload and logs the inquiry server-side for development.
-
-### Supabase live database + storage
-
-Required for production data fetching, live admin ingestion, and order persistence:
-
-```bash
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=...
-SUPABASE_SERVICE_ROLE_KEY=...
-SUPABASE_ARCHIVE_BUCKET=archive
-SUPABASE_RECEIPTS_BUCKET=receipts
-```
-
-Run `supabase/schema.sql` in the Supabase SQL editor before launch.
-
-### Chapa / TeleBirr payment webhook
-
-```bash
-CHAPA_SECRET_KEY=...
-CHAPA_WEBHOOK_SECRET=...
-CHAPA_VERIFY_BASE_URL=https://api.chapa.co/v1/transaction/verify
-```
-
-Webhook URL:
-
-```text
-https://your-domain.com/api/webhooks/payment
-```
-
-### Optional Sanity development variables
-
-Only needed if editing the optional Sanity schemas locally:
-
-```bash
-NEXT_PUBLIC_SANITY_PROJECT_ID=...
-NEXT_PUBLIC_SANITY_DATASET=production
-SANITY_API_READ_TOKEN=...
-```
-
-## Stripe webhook
-
-Create a Stripe webhook endpoint:
-
-```text
-https://your-domain.com/api/webhooks/stripe
-```
-
-Subscribe to:
-
-```text
-checkout.session.completed
-```
-
-Paste the webhook signing secret into `STRIPE_WEBHOOK_SECRET`.
-
-## Security headers
-
-`vercel.json` sets:
-
-- `X-Frame-Options: DENY`
-- `X-Content-Type-Options: nosniff`
-- `Referrer-Policy: strict-origin-when-cross-origin`
-- `Permissions-Policy`
-- `Content-Security-Policy`
-- immutable cache headers for `/images/*`
-
-## Pre-deployment commands
-
-Run locally before pushing:
-
-```bash
-npm run typecheck
-npm run build
-```
-
-Both commands should complete successfully.
+This runs type-checking, the monochrome design audit, and a production build.
