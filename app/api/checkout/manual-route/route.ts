@@ -1,28 +1,9 @@
 import { NextResponse } from 'next/server';
 import { getPhotographByCode, printSizes } from '@/lib/data';
+import { getClientIp, rateLimit, rateLimitHeaders } from '@/lib/rateLimit';
 import { getSupabaseServiceClient } from '@/lib/supabase';
 
 const ETHIOPIAN_PHONE_PATTERN = /^(?:\+251|251|0)(?:9|7)\d{8}$/;
-
-// Simple in-memory rate limiting for manual transfer route
-const rateLimits = new Map<string, { count: number; resetAt: number }>();
-const LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
-const MAX_REQUESTS_PER_WINDOW = 5;
-
-function checkRateLimit(ip: string) {
-  const now = Date.now();
-  const limit = rateLimits.get(ip);
-
-  if (!limit || now > limit.resetAt) {
-    rateLimits.set(ip, { count: 1, resetAt: now + LIMIT_WINDOW_MS });
-    return true;
-  }
-
-  if (limit.count >= MAX_REQUESTS_PER_WINDOW) return false;
-
-  limit.count++;
-  return true;
-}
 
 function normalizePhone(value: string) {
   return value.replace(/[\s-]/g, '');
@@ -33,9 +14,13 @@ function cleanFileName(value: string) {
 }
 
 export async function POST(request: Request) {
-  const ip = request.headers.get('x-forwarded-for') ?? 'unknown';
-  if (!checkRateLimit(ip)) {
-    return NextResponse.json({ ok: false, error: 'Too many requests. Please try again in an hour.' }, { status: 429 });
+  const ip = getClientIp(request);
+  const rl = rateLimit({ key: `manual-route:${ip}`, limit: 5, windowMs: 60 * 60 * 1000 });
+  if (!rl.ok) {
+    return NextResponse.json(
+      { ok: false, error: 'Too many requests. Please try again in an hour.' },
+      { status: 429, headers: rateLimitHeaders(rl) }
+    );
   }
 
   const formData = await request.formData();
@@ -74,7 +59,15 @@ export async function POST(request: Request) {
 
   if (uploadError) return NextResponse.json({ ok: false, error: `Transfer receipt upload failed: ${uploadError.message}` }, { status: 500 });
 
-  const { data: publicReceipt } = supabase.storage.from('transfer_receipts').getPublicUrl(objectPath);
+  // Bucket is private — generate a long-lived signed URL for admin review
+  const { data: signedReceipt, error: signedUrlError } = await supabase.storage
+    .from('transfer_receipts')
+    .createSignedUrl(objectPath, 60 * 60 * 24 * 90); // 90 days
+
+  if (signedUrlError || !signedReceipt) {
+    return NextResponse.json({ ok: false, error: 'Failed to generate receipt URL.' }, { status: 500 });
+  }
+
   const amountEtb = Math.round(size.priceCents / 100);
 
   const { data, error } = await supabase
@@ -97,7 +90,7 @@ export async function POST(request: Request) {
       metadata: {
         orderType: 'manual_transfer',
         transferReference,
-        transferReceiptUrl: publicReceipt.publicUrl,
+        transferReceiptUrl: signedReceipt.signedUrl,
         transferReceiptPath: objectPath
       }
     })
